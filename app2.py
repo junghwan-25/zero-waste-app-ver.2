@@ -1,5 +1,18 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- 1. Matplotlib 한글 폰트 설정 시작 ---
+# 시스템 환경에 따라 'Malgun Gothic', 'AppleGothic', 'NanumGothic' 등이 사용될 수 있습니다.
+# Streamlit 환경을 위해 'Malgun Gothic'을 기본으로 시도합니다.
+try:
+    plt.rcParams['font.family'] = 'Malgun Gothic' # Windows 기준 폰트
+    plt.rcParams['axes.unicode_minus'] = False # 마이너스 부호 깨짐 방지
+except Exception as e:
+    # 폰트 설정 실패 시 오류 출력 (선택 사항)
+    # st.error(f"폰트 설정 오류: {e}")
+    pass
+# --- Matplotlib 한글 폰트 설정 끝 ---
 
 st.set_page_config(page_title="제로웨이스트 소비 분석", layout="wide")
 
@@ -37,8 +50,9 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
     COST_COLUMN = '금액'
     QUANTITY_COLUMN = '수량'
     CO2_EMISSION_COLUMN = '탄소 배출량(kg)'
+    TOTAL_COST_COLUMN = '총금액' # 수량x금액을 저장할 새로운 컬럼
 
-    # --- 2. 데이터 읽기 ---
+    # --- 2. 데이터 읽기 및 전처리 ---
     try:
         df = pd.read_excel(file, sheet_name=sheet_name)
     except Exception as e:
@@ -49,6 +63,7 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
         st.error(f"❌ 엑셀에 '{ITEM_COLUMN}' 또는 '{COST_COLUMN}' 컬럼이 없습니다.")
         return None
 
+    # 금액 컬럼 정제 및 float 변환 (개당 금액)
     df[COST_COLUMN] = (
         df[COST_COLUMN].astype(str)
         .str.replace(r'[^\d.]', '', regex=True)
@@ -57,6 +72,7 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
     )
     df[ITEM_COLUMN] = df[ITEM_COLUMN].fillna('').astype(str).str.lower()
 
+    # 수량 컬럼 정제 및 int 변환 (없으면 기본값 1)
     if QUANTITY_COLUMN not in df.columns:
         df[QUANTITY_COLUMN] = 1
     else:
@@ -68,14 +84,19 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
             .astype(int)
         )
 
-    # 친환경 여부
+    # --- 총금액 (수량 * 금액) 계산 ---
+    df[TOTAL_COST_COLUMN] = df[COST_COLUMN] * df[QUANTITY_COLUMN]
+
+
+    # 친환경 여부 플래그 설정
     df['친환경 여부'] = False
     for keyword in GREEN_KEYWORDS:
         df.loc[df[ITEM_COLUMN].str.contains(keyword), '친환경 여부'] = True
 
-    # --- 3. CO2 계산 ---
+    # --- 3. CO2 계산 (수량 반영) ---
     df['CO2_절감량(kg)'] = 0.0
     for keyword, savings in CO2_SAVINGS_MAP.items():
+        # 절감량 = 수량 * 개당 절감량
         df.loc[df[ITEM_COLUMN].str.contains(keyword) & df['친환경 여부'], 'CO2_절감량(kg)'] = \
             df[QUANTITY_COLUMN] * savings
 
@@ -93,6 +114,7 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
         co2_calculation_method = "실제 기록된 값 기반"
 
     else:
+        # 기준 배출량 = 수량 * 개당 기준 배출량
         df['CO2_기준배출량(kg)'] = df[QUANTITY_COLUMN] * DEFAULT_BASE_EMISSION
         for keyword, emission in BASE_EMISSION_MAP.items():
             df.loc[df[ITEM_COLUMN].str.contains(keyword), 'CO2_기준배출량(kg)'] = \
@@ -102,9 +124,9 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
         total_actual_co2 = total_conventional_co2 - total_co2_savings
         co2_calculation_method = "추정치 기반"
 
-    # --- 4. 금액 분석 ---
-    total_cost = df[COST_COLUMN].sum()
-    eco_cost = df.loc[df['친환경 여부'], COST_COLUMN].sum()
+    # --- 4. 금액 분석 (총금액 기준) ---
+    total_cost = df[TOTAL_COST_COLUMN].sum()
+    eco_cost = df.loc[df['친환경 여부'], TOTAL_COST_COLUMN].sum()
     eco_ratio = (eco_cost / total_cost) * 100 if total_cost > 0 else 0.0
 
     # --- 5. Streamlit 출력 ---
@@ -127,7 +149,9 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
         st.write("없음")
 
     st.subheader("📈 친환경 여부별 소비 금액 비교")
-    eco_vs_non_cost = df.groupby('친환경 여부')[COST_COLUMN].sum()
+    # 총금액 컬럼을 사용하여 차트 데이터 계산
+    eco_vs_non_cost = df.groupby('친환경 여부')[TOTAL_COST_COLUMN].sum()
+    eco_vs_non_cost.index = eco_vs_non_cost.index.map({True: '친환경 소비', False: '일반 소비'})
     st.bar_chart(eco_vs_non_cost)
 
     st.subheader("🔥 CO₂ 절감량 상위 10개 품목")
@@ -140,14 +164,39 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
     st.bar_chart(top10_co2)
 
     st.subheader("🥧 카테고리별 소비 금액 비율")
+    # 총금액 컬럼을 사용하여 차트 데이터 계산
+    category_cost = df.groupby(ITEM_COLUMN)[TOTAL_COST_COLUMN].sum()
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    # 데이터가 너무 많을 경우 상위 10개만 표시
+    if len(category_cost) > 10:
+        # 기타 항목으로 묶기
+        top_n = 9
+        top_categories = category_cost.nlargest(top_n)
+        other_sum = category_cost.iloc[top_n:].sum()
+        
+        # '기타' 항목이 0인 경우를 대비
+        if other_sum > 0:
+            category_cost_for_chart = pd.concat([top_categories, pd.Series([other_sum], index=['기타'])])
+        else:
+            category_cost_for_chart = top_categories
+    else:
+        category_cost_for_chart = category_cost
 
-    import matplotlib.pyplot as plt
-    category_cost = df.groupby(ITEM_COLUMN)[COST_COLUMN].sum()
-    fig, ax = plt.subplots()
-    ax.pie(category_cost, labels=category_cost.index, autopct="%1.1f%%")
-    ax.axis("equal")
+    ax.pie(
+        category_cost_for_chart, 
+        labels=category_cost_for_chart.index, 
+        autopct="%1.1f%%", 
+        startangle=90,
+        textprops={'fontsize': 10}
+    )
+    ax.axis("equal") # 원형 파이 차트 유지
+    
     st.pyplot(fig)
     
+    st.subheader("📋 전체 데이터 (수량 및 총금액 반영)")
+    st.dataframe(df)
+
     return df
 
 
@@ -164,6 +213,9 @@ if st.button("분석 시작하기 🚀"):
         st.warning("⚠ 엑셀 파일을 먼저 업로드하세요.")
     else:
         st.success("분석을 시작합니다!")
-        load_and_analyze_data(uploaded_file, sheet_name)
+        # 로딩 스피너 추가
+        with st.spinner('데이터를 분석 중입니다...'):
+            load_and_analyze_data(uploaded_file, sheet_name)
+
 
 
