@@ -1,5 +1,11 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+# 한글 폰트 설정
+font_path = fm.findfont("NanumGothic")
+plt.rc('font', family='NanumGothic')
 
 st.set_page_config(page_title="제로웨이스트 소비 분석", layout="wide")
 
@@ -165,4 +171,5 @@ if st.button("분석 시작하기 🚀"):
     else:
         st.success("분석을 시작합니다!")
         load_and_analyze_data(uploaded_file, sheet_name)
+
 
