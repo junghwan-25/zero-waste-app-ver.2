@@ -126,7 +126,7 @@ def load_and_analyze_data(file, sheet_name='Sheet1'):
     else:
         st.write("없음")
 
-     st.subheader("📈 친환경 여부별 소비 금액 비교")
+    st.subheader("📈 친환경 여부별 소비 금액 비교")
     eco_vs_non_cost = df.groupby('친환경 여부')[COST_COLUMN].sum()
     st.bar_chart(eco_vs_non_cost)
 
@@ -165,3 +165,4 @@ if st.button("분석 시작하기 🚀"):
     else:
         st.success("분석을 시작합니다!")
         load_and_analyze_data(uploaded_file, sheet_name)
+
