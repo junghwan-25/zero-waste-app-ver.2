@@ -1,6 +1,12 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import font_manager, rc
+
+font_path = './NanumGothic.ttf'
+font = font_manager.FontProperties(fname=font_path).get_name()
+rc('font', family=font)
+plt.rcParams['axes.unicode_minus'] = False
 
 # --- 1. Matplotlib 한글 폰트 설정 시작 ---
 # 시스템 환경에 따라 'Malgun Gothic', 'AppleGothic', 'NanumGothic' 등이 사용될 수 있습니다.
@@ -216,6 +222,7 @@ if st.button("분석 시작하기 🚀"):
         # 로딩 스피너 추가
         with st.spinner('데이터를 분석 중입니다...'):
             load_and_analyze_data(uploaded_file, sheet_name)
+
 
 
 
