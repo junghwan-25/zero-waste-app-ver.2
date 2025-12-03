@@ -8,17 +8,7 @@ font = font_manager.FontProperties(fname=font_path).get_name()
 rc('font', family=font)
 plt.rcParams['axes.unicode_minus'] = False
 
-# --- 1. Matplotlib 한글 폰트 설정 시작 ---
-# 시스템 환경에 따라 'Malgun Gothic', 'AppleGothic', 'NanumGothic' 등이 사용될 수 있습니다.
-# Streamlit 환경을 위해 'Malgun Gothic'을 기본으로 시도합니다.
-try:
-    plt.rcParams['font.family'] = 'Malgun Gothic' # Windows 기준 폰트
-    plt.rcParams['axes.unicode_minus'] = False # 마이너스 부호 깨짐 방지
-except Exception as e:
-    # 폰트 설정 실패 시 오류 출력 (선택 사항)
-    # st.error(f"폰트 설정 오류: {e}")
-    pass
-# --- Matplotlib 한글 폰트 설정 끝 ---
+
 
 st.set_page_config(page_title="제로웨이스트 소비 분석", layout="wide")
 
@@ -222,6 +212,7 @@ if st.button("분석 시작하기 🚀"):
         # 로딩 스피너 추가
         with st.spinner('데이터를 분석 중입니다...'):
             load_and_analyze_data(uploaded_file, sheet_name)
+
 
 
 
