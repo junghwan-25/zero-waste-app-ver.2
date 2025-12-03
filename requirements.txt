@@ -2,7 +2,8 @@ streamlit
 pandas
 openpyxl
 matplotlib
-fonttools
+nanum-fonts
+
 
 
 
